@@ -160,6 +160,7 @@
         .auth-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1); }
         .auth-btn { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
         .auth-btn:hover { background: var(--primary-hover); }
+        .auth-btn:disabled { background: #94a3b8; cursor: not-allowed; }
         .auth-switch { text-align: center; margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; }
         .auth-switch:hover { color: var(--primary); text-decoration: underline; }
         .auth-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1; }
@@ -179,14 +180,14 @@
 </head>
 <body>
 
- <div id="auth-modal-overlay">
+    <div id="auth-modal-overlay">
         <div id="auth-modal">
             <button id="btn-close-auth" class="auth-close">×</button>
             <h2 id="auth-modal-title">Login with OTP</h2>
             
             <div id="phone-step">
                 <input type="tel" id="auth-phone" class="auth-input" placeholder="+91 9876543210" required>
-                <div id="recaptcha-container" style="margin-bottom: 15px; display: flex; justify-content: center;"></div>
+                <div id="recaptcha-container"></div>
                 <button id="btn-send-otp" class="auth-btn">Send OTP</button>
             </div>
 
@@ -219,7 +220,7 @@
             </div>
             <div id="auth-ui-logged-in" style="margin-top: 15px; display: none; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
                 <span id="user-email-display" style="font-size: 0.8rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">
-                    user@example.com
+                    User
                 </span>
                 <div style="display: flex; gap: 5px;">
                     <button id="btn-cloud-save" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; margin: 0; width: auto; color: white; background: var(--primary); border: none;" title="Save to Cloud">Save</button>
@@ -486,8 +487,8 @@
         let historyIndex = -1;
 
         // Auth & Firebase State
-        let auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, currentUser = null;
-        let isSignUpMode = false;
+        let auth, db, signOut, doc, setDoc, getDoc, currentUser = null;
+        let confirmationResult;
 
         // --- DOM ELEMENTS ---
         const fileUpload = document.getElementById('file-upload'), statusMsg = document.getElementById('status-msg');
@@ -609,7 +610,7 @@
                 else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
             });
 
-   // Auth Modal Events
+            // Auth Modal Events
             document.getElementById('btn-open-login').addEventListener('click', () => { 
                 document.getElementById('auth-modal-overlay').style.display = 'flex'; 
                 document.getElementById('auth-error').style.display = 'none';
@@ -656,18 +657,18 @@
                 signOut = authModule.signOut;
                 doc = firestoreModule.doc; setDoc = firestoreModule.setDoc; getDoc = firestoreModule.getDoc;
 
-                // Initialize reCAPTCHA for Phone Auth
+                // Use INVISIBLE reCAPTCHA to prevent UI blocking
                 window.recaptchaVerifier = new authModule.RecaptchaVerifier(auth, 'recaptcha-container', {
-                    'size': 'normal'
+                    'size': 'invisible'
                 });
 
-                let confirmationResult;
                 const phoneStep = document.getElementById('phone-step');
                 const otpStep = document.getElementById('otp-step');
                 const errEl = document.getElementById('auth-error');
+                const btnSendOtp = document.getElementById('btn-send-otp');
 
                 // Step 1: Send the SMS
-                document.getElementById('btn-send-otp').addEventListener('click', async () => {
+                btnSendOtp.addEventListener('click', async () => {
                     const phoneNumber = document.getElementById('auth-phone').value.trim();
                     errEl.style.display = 'none';
                     
@@ -679,7 +680,9 @@
                     }
                     
                     try {
-                        setStatus("Sending OTP...", false);
+                        btnSendOtp.textContent = "Sending...";
+                        btnSendOtp.disabled = true;
+                        
                         confirmationResult = await authModule.signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
                         phoneStep.style.display = 'none';
                         otpStep.style.display = 'block';
@@ -687,21 +690,35 @@
                     } catch (error) {
                         errEl.textContent = error.message.replace('Firebase: ', '');
                         errEl.style.display = 'block';
+                        btnSendOtp.textContent = "Send OTP";
+                        btnSendOtp.disabled = false;
+                        
+                        // Reset recaptcha if it fails so the user can try again
+                        if (window.recaptchaVerifier) {
+                            window.recaptchaVerifier.render().then((widgetId) => {
+                                window.grecaptcha.reset(widgetId);
+                            });
+                        }
                     }
                 });
 
                 // Step 2: Verify the Code
-                document.getElementById('btn-verify-otp').addEventListener('click', async () => {
+                const btnVerifyOtp = document.getElementById('btn-verify-otp');
+                btnVerifyOtp.addEventListener('click', async () => {
                     const code = document.getElementById('auth-otp').value.trim();
                     errEl.style.display = 'none';
                     try {
-                        setStatus("Verifying OTP...", false);
+                        btnVerifyOtp.textContent = "Verifying...";
+                        btnVerifyOtp.disabled = true;
+                        
                         await confirmationResult.confirm(code);
                         document.getElementById('auth-modal-overlay').style.display = 'none';
                         setStatus("Successfully logged in.", false);
                     } catch (error) {
                         errEl.textContent = "Invalid OTP. Please try again.";
                         errEl.style.display = 'block';
+                        btnVerifyOtp.textContent = "Verify & Login";
+                        btnVerifyOtp.disabled = false;
                     }
                 });
 
@@ -712,63 +729,12 @@
                     if (currentUser && !currentUser.isAnonymous) {
                         loggedOutUi.style.display = 'none';
                         loggedInUi.style.display = 'flex';
-                        // Display the phone number in the sidebar instead of email
                         document.getElementById('user-email-display').textContent = currentUser.phoneNumber || "User";
                     } else {
                         loggedOutUi.style.display = 'block';
                         loggedInUi.style.display = 'none';
                     }
                 });
-
-                const initAuth = async () => {
-                    await authModule.signInAnonymously(auth);
-                };
-                await initAuth();
-
-            } catch (e) { console.error("Firebase init failed:", e); }
-        }
-        async function initFirebase() {
-            try {
-                const appModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
-                const authModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
-                const firestoreModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
-
-                const firebaseConfig = {
-                  apiKey: "AIzaSyC-bz7BBVdppJWB1wB1f57vMX1LhDAlBxg",
-                  authDomain: "rewacmp.firebaseapp.com",
-                  projectId: "rewacmp",
-                  storageBucket: "rewacmp.firebasestorage.app",
-                  messagingSenderId: "832105705350",
-                  appId: "1:832105705350:web:85aebb706910364e668607",
-                  measurementId: "G-K9B5P4GEZD"
-                };
-
-                const app = appModule.initializeApp(firebaseConfig);
-                auth = authModule.getAuth(app); db = firestoreModule.getFirestore(app);
-                createUserWithEmailAndPassword = authModule.createUserWithEmailAndPassword;
-                signInWithEmailAndPassword = authModule.signInWithEmailAndPassword;
-                signOut = authModule.signOut;
-                doc = firestoreModule.doc; setDoc = firestoreModule.setDoc; getDoc = firestoreModule.getDoc;
-
-                authModule.onAuthStateChanged(auth, (user) => {
-                    currentUser = user;
-                    const loggedOutUi = document.getElementById('auth-ui-logged-out');
-                    const loggedInUi = document.getElementById('auth-ui-logged-in');
-                    if (currentUser && !currentUser.isAnonymous) {
-                        loggedOutUi.style.display = 'none';
-                        loggedInUi.style.display = 'flex';
-                        document.getElementById('user-email-display').textContent = currentUser.email || "User";
-                    } else {
-                        loggedOutUi.style.display = 'block';
-                        loggedInUi.style.display = 'none';
-                    }
-                });
-
-                const initAuth = async () => {
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await authModule.signInWithCustomToken(auth, __initial_auth_token);
-                    else await authModule.signInAnonymously(auth);
-                };
-                await initAuth();
 
             } catch (e) { console.error("Firebase init failed:", e); }
         }
