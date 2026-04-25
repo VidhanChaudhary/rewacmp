@@ -741,16 +741,16 @@
             try {
                 setStatus("Saving to Firestore...", false);
                 
-                // MATCHING YOUR SCREENSHOT: artifacts > default-app-id > users > [Your ID]
                 const userDoc = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid);
                 
                 await setDoc(userDoc, {
                     populationData: populationData,
-                    mapData: mapData,
-                    stylingMode: stylingMode, // Added to preserve your styling progress
-                    defaultTextStyle: defaultTextStyle, // Added to preserve your styling progress
+                    mapDataString: JSON.stringify(mapData), // Bypasses Firestore nested array limits
+                    stylingMode: stylingMode, // Preserves your styling progress
+                    defaultTextStyle: defaultTextStyle, // Preserves your styling progress
                     lastSaved: new Date().toISOString()
                 });
+                
                 setStatus("✓ Saved to Cloud!");
             } catch (e) {
                 console.error(e);
@@ -763,18 +763,25 @@
             try {
                 setStatus("Loading from Firestore...", false);
                 
-                // MATCHING YOUR SCREENSHOT
                 const userDoc = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid);
                 const docSnap = await getDoc(userDoc);
                 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     populationData = data.populationData || {};
-                    mapData = data.mapData || null;
                     
                     // Restoring styling configurations safely
                     if(data.stylingMode) stylingMode = data.stylingMode;
                     if(data.defaultTextStyle) Object.assign(defaultTextStyle, data.defaultTextStyle);
+                    
+                    // Parse the string back into actual Map Data object
+                    if (data.mapDataString) {
+                        mapData = JSON.parse(data.mapDataString);
+                    } else if (data.mapData) {
+                        // Fallback for old data structure
+                        mapData = data.mapData;
+                    }
+                    
                     if (mapData && mapData.features) { mapData.features.forEach(f => { if (!f.textStyle) f.textStyle = { ...defaultTextStyle }; }); }
 
                     if (mapData) {
