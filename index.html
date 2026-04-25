@@ -183,17 +183,11 @@
     <div id="auth-modal-overlay">
         <div id="auth-modal">
             <button id="btn-close-auth" class="auth-close">×</button>
-            <h2 id="auth-modal-title">Login with OTP</h2>
+            <h2 id="auth-modal-title">Login with Email Link</h2>
             
-            <div id="phone-step">
-                <input type="tel" id="auth-phone" class="auth-input" placeholder="+91 9876543210" required>
-                <div id="recaptcha-container"></div>
-                <button id="btn-send-otp" class="auth-btn">Send OTP</button>
-            </div>
-
-            <div id="otp-step" style="display: none;">
-                <input type="text" id="auth-otp" class="auth-input" placeholder="Enter 6-digit OTP" required>
-                <button id="btn-verify-otp" class="auth-btn">Verify & Login</button>
+            <div>
+                <input type="email" id="auth-email" class="auth-input" placeholder="Enter your email" required>
+                <button id="btn-submit-auth" class="auth-btn">Send Login Link</button>
             </div>
 
             <div id="auth-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 10px; text-align: center; display: none;"></div>
@@ -488,7 +482,6 @@
 
         // Auth & Firebase State
         let auth, db, signOut, doc, setDoc, getDoc, currentUser = null;
-        let confirmationResult;
 
         // --- DOM ELEMENTS ---
         const fileUpload = document.getElementById('file-upload'), statusMsg = document.getElementById('status-msg');
@@ -610,20 +603,17 @@
                 else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
             });
 
-            // Auth Modal Events
+            // --- Auth Modal Events ---
             document.getElementById('btn-open-login').addEventListener('click', () => { 
                 document.getElementById('auth-modal-overlay').style.display = 'flex'; 
                 document.getElementById('auth-error').style.display = 'none';
-                document.getElementById('phone-step').style.display = 'block';
-                document.getElementById('otp-step').style.display = 'none';
             });
-            
-            document.getElementById('btn-close-auth').addEventListener('click', () => {
-                document.getElementById('auth-modal-overlay').style.display = 'none';
+            document.getElementById('btn-close-auth').addEventListener('click', () => { 
+                document.getElementById('auth-modal-overlay').style.display = 'none'; 
             });
 
             document.getElementById('btn-sign-out').addEventListener('click', async () => {
-                if (auth) {
+                if (auth && signOut) {
                     await signOut(auth);
                     setStatus("Signed out successfully.", false);
                 }
@@ -635,104 +625,85 @@
             initZoomAndPan(); saveState(); initFirebase();
         }
 
+        // --- Firebase Initialization & Auto-Login Logic ---
         async function initFirebase() {
             try {
                 const appModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
                 const authModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
-                const firestoreModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+                const dbModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
                 const firebaseConfig = {
-                  apiKey: "AIzaSyC-bz7BBVdppJWB1wB1f57vMX1LhDAlBxg",
-                  authDomain: "rewacmp.firebaseapp.com",
-                  projectId: "rewacmp",
-                  storageBucket: "rewacmp.firebasestorage.app",
-                  messagingSenderId: "832105705350",
-                  appId: "1:832105705350:web:85aebb706910364e668607",
-                  measurementId: "G-K9B5P4GEZD"
+                    apiKey: "AIzaSyC-bz7BBVdppJWB1wB1f57vMX1LhDAlBxg",
+                    authDomain: "rewacmp.firebaseapp.com",
+                    projectId: "rewacmp",
+                    storageBucket: "rewacmp.firebasestorage.app",
+                    messagingSenderId: "832105705350",
+                    appId: "1:832105705350:web:85aebb706910364e668607"
                 };
 
                 const app = appModule.initializeApp(firebaseConfig);
-                auth = authModule.getAuth(app); 
-                db = firestoreModule.getFirestore(app);
+                auth = authModule.getAuth(app);
+                db = dbModule.getFirestore(app);
+                
+                // Expose methods needed by cloud save/load
                 signOut = authModule.signOut;
-                doc = firestoreModule.doc; setDoc = firestoreModule.setDoc; getDoc = firestoreModule.getDoc;
+                doc = dbModule.doc; 
+                setDoc = dbModule.setDoc; 
+                getDoc = dbModule.getDoc;
 
-                // Use INVISIBLE reCAPTCHA to prevent UI blocking
-                window.recaptchaVerifier = new authModule.RecaptchaVerifier(auth, 'recaptcha-container', {
-                    'size': 'invisible'
-                });
-
-                const phoneStep = document.getElementById('phone-step');
-                const otpStep = document.getElementById('otp-step');
-                const errEl = document.getElementById('auth-error');
-                const btnSendOtp = document.getElementById('btn-send-otp');
-
-                // Step 1: Send the SMS
-                btnSendOtp.addEventListener('click', async () => {
-                    const phoneNumber = document.getElementById('auth-phone').value.trim();
-                    errEl.style.display = 'none';
-                    
-                    // Force country code requirement
-                    if(!phoneNumber.startsWith('+')) {
-                        errEl.textContent = "Please include country code (e.g., +91)";
-                        errEl.style.display = 'block';
-                        return;
+                // CHECK IF USER IS RETURNING FROM EMAIL LINK
+                if (authModule.isSignInWithEmailLink(auth, window.location.href)) {
+                    let email = window.localStorage.getItem('emailForSignIn');
+                    if (!email) {
+                        email = window.prompt('Please provide your email for confirmation');
                     }
-                    
-                    try {
-                        btnSendOtp.textContent = "Sending...";
-                        btnSendOtp.disabled = true;
-                        
-                        confirmationResult = await authModule.signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
-                        phoneStep.style.display = 'none';
-                        otpStep.style.display = 'block';
-                        setStatus("OTP sent via SMS!", false);
-                    } catch (error) {
-                        errEl.textContent = error.message.replace('Firebase: ', '');
-                        errEl.style.display = 'block';
-                        btnSendOtp.textContent = "Send OTP";
-                        btnSendOtp.disabled = false;
-                        
-                        // Reset recaptcha if it fails so the user can try again
-                        if (window.recaptchaVerifier) {
-                            window.recaptchaVerifier.render().then((widgetId) => {
-                                window.grecaptcha.reset(widgetId);
-                            });
-                        }
-                    }
-                });
-
-                // Step 2: Verify the Code
-                const btnVerifyOtp = document.getElementById('btn-verify-otp');
-                btnVerifyOtp.addEventListener('click', async () => {
-                    const code = document.getElementById('auth-otp').value.trim();
-                    errEl.style.display = 'none';
-                    try {
-                        btnVerifyOtp.textContent = "Verifying...";
-                        btnVerifyOtp.disabled = true;
-                        
-                        await confirmationResult.confirm(code);
-                        document.getElementById('auth-modal-overlay').style.display = 'none';
-                        setStatus("Successfully logged in.", false);
-                    } catch (error) {
-                        errEl.textContent = "Invalid OTP. Please try again.";
-                        errEl.style.display = 'block';
-                        btnVerifyOtp.textContent = "Verify & Login";
-                        btnVerifyOtp.disabled = false;
-                    }
-                });
+                    await authModule.signInWithEmailLink(auth, email, window.location.href);
+                    window.localStorage.removeItem('emailForSignIn');
+                    // Clean the URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                }
 
                 authModule.onAuthStateChanged(auth, (user) => {
                     currentUser = user;
                     const loggedOutUi = document.getElementById('auth-ui-logged-out');
                     const loggedInUi = document.getElementById('auth-ui-logged-in');
-                    if (currentUser && !currentUser.isAnonymous) {
+                    if (user) {
                         loggedOutUi.style.display = 'none';
                         loggedInUi.style.display = 'flex';
-                        document.getElementById('user-email-display').textContent = currentUser.phoneNumber || "User";
+                        document.getElementById('user-email-display').textContent = user.email || "User";
                     } else {
                         loggedOutUi.style.display = 'block';
                         loggedInUi.style.display = 'none';
+                    }
+                });
+
+                // Update the Login Button to send the link
+                document.getElementById('btn-submit-auth').addEventListener('click', async () => {
+                    const email = document.getElementById('auth-email').value;
+                    if(!email) return alert("Please enter an email address.");
+                    
+                    const actionCodeSettings = {
+                        url: window.location.href, // Points back to your GitHub page
+                        handleCodeInApp: true
+                    };
+
+                    try {
+                        const btn = document.getElementById('btn-submit-auth');
+                        btn.textContent = "Sending...";
+                        btn.disabled = true;
+
+                        await authModule.sendSignInLinkToEmail(auth, email, actionCodeSettings);
+                        window.localStorage.setItem('emailForSignIn', email);
+                        alert('Check your email! We sent you a login link.');
+                        document.getElementById('auth-modal-overlay').style.display = 'none';
+                        
+                        btn.textContent = "Send Login Link";
+                        btn.disabled = false;
+                    } catch (error) {
+                        alert(error.message);
+                        const btn = document.getElementById('btn-submit-auth');
+                        btn.textContent = "Send Login Link";
+                        btn.disabled = false;
                     }
                 });
 
