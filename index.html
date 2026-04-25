@@ -228,7 +228,7 @@
         </div>
     </div>
 
-    <div id="sidebar">
+    <div id="sidebar" style="display: none;">
         <div class="sidebar-header" style="flex-direction: column; align-items: stretch;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
                 <div>
@@ -448,7 +448,7 @@
         </div>
     </div>
 
-    <div id="main-area">
+    <div id="main-area" style="display: none;">
         <div id="tooltip">
             <span>Ward: <span id="tt-ward" class="text-primary"></span></span>
             <div class="divider"></div>
@@ -701,7 +701,7 @@
                             document.getElementById(tabs[s]).classList.toggle('active', s === key);
                             // Reset Tab colors if needed
                             document.getElementById(tabs[s]).style.background = (s === key) ? 'var(--primary)' : '#f8fafc';
-                            document.getElementById(tabs[s]).style.color = (s === key) ? 'white' : 'black';
+                            document.getElementById(tabs[s]).style.color = (s === key) ? 'black' : '#64748b';
                         });
                         document.getElementById(tabs[key]).style.background = 'var(--primary)';
                         document.getElementById(tabs[key]).style.color = 'white';
@@ -796,12 +796,36 @@
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
-                // Auth State Observer
+                // --- THE GATEKEEPER LOGIC ---
                 authM.onAuthStateChanged(auth, (user) => {
-                    currentUser = user;
-                    document.getElementById('auth-ui-logged-out').style.display = user ? 'none' : 'block';
-                    document.getElementById('auth-ui-logged-in').style.display = user ? 'flex' : 'none';
-                    if (user) document.getElementById('user-email-display').textContent = user.email || user.phoneNumber || "User";
+                    const overlay = document.getElementById('auth-modal-overlay');
+                    const sidebar = document.getElementById('sidebar');
+                    const mainArea = document.getElementById('main-area');
+                    const closeBtn = document.getElementById('btn-close-auth');
+
+                    if (user) {
+                        // USER IS LOGGED IN: Show the site, hide the login box
+                        currentUser = user;
+                        overlay.style.display = 'none';
+                        sidebar.style.display = 'flex';
+                        mainArea.style.display = 'flex';
+                        
+                        document.getElementById('auth-ui-logged-in').style.display = 'flex';
+                        document.getElementById('auth-ui-logged-out').style.display = 'none';
+                        document.getElementById('user-email-display').textContent = user.email || user.phoneNumber || "User";
+                        
+                        // Show the close button now that they are in
+                        closeBtn.style.display = 'block';
+                    } else {
+                        // USER IS LOGGED OUT: Hide the site, force the login box
+                        currentUser = null;
+                        sidebar.style.display = 'none';
+                        mainArea.style.display = 'none';
+                        overlay.style.display = 'flex';
+                        
+                        // Hide the close button so they can't bypass the login
+                        closeBtn.style.display = 'none';
+                    }
                 });
 
             } catch (e) { console.error("Firebase init failed:", e); }
