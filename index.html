@@ -236,6 +236,39 @@
         </div>
     </div>
 
+    <div id="profile-modal-overlay" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: none; align-items: center; justify-content: center;">
+        <div id="profile-modal" style="background: white; width: 500px; max-height: 85vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="padding: 20px; background: var(--primary); color: white; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="font-size: 1.2rem;">User Profile & Projects</h2>
+                <button onclick="document.getElementById('profile-modal-overlay').style.display='none'" style="background:none; border:none; color:white; font-size: 1.5rem; cursor:pointer;">&times;</button>
+            </div>
+
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                <section style="margin-bottom: 25px; padding-bottom: 20px; border-bottom: 1px solid #eee;">
+                    <label style="font-weight: bold; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Account Information</label>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-top: 10px;">
+                        <div style="width: 50px; height: 50px; background: #eef2ff; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--primary); font-weight: bold; font-size: 1.2rem;" id="user-initial">U</div>
+                        <div>
+                            <p id="prof-email" style="font-weight: bold; margin: 0;"></p>
+                            <span id="prof-uid" style="font-size: 0.7rem; color: #94a3b8;"></span>
+                        </div>
+                    </div>
+                    <button id="btn-change-pass" style="margin-top: 15px; font-size: 0.75rem; color: var(--primary); background: none; border: 1px solid var(--primary); padding: 5px 10px; border-radius: 4px; cursor: pointer;">Send Password Reset Link</button>
+                </section>
+
+                <section>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <label style="font-weight: bold; font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Saved Projects</label>
+                        <button id="btn-refresh-list" style="font-size: 0.7rem; color: var(--primary); background:none; border:none; cursor:pointer;">Refresh List</button>
+                    </div>
+                    <div id="project-list" style="display: flex; flex-direction: column; gap: 10px;">
+                        <p style="font-size: 0.8rem; color: #94a3b8; text-align: center;">No saved maps found.</p>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <div id="sidebar" style="display: none;">
         <div class="sidebar-header" style="flex-direction: column; align-items: stretch;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
@@ -260,7 +293,7 @@
                 </span>
                 <div style="display: flex; gap: 5px;">
                     <button id="btn-cloud-save" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; margin: 0; width: auto; color: white; background: var(--primary); border: none;" title="Save to Cloud">Save</button>
-                    <button id="btn-cloud-load" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; margin: 0; width: auto; color: var(--primary); background: #eef2ff; border-color: #c7d2fe;" title="Load from Cloud">Load</button>
+                    <button id="btn-cloud-load" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; margin: 0; width: auto; color: var(--primary); background: #eef2ff; border-color: #c7d2fe;" title="View Saved Projects">Projects</button>
                     <button id="btn-sign-out" title="Sign Out" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 2px; margin-left: 4px; font-weight: bold; font-size: 1rem;">✕</button>
                 </div>
             </div>
@@ -523,7 +556,7 @@
         let historyIndex = -1;
 
         // Auth & Firebase State
-        let auth, db, signOut, doc, setDoc, getDoc, currentUser = null;
+        let auth, db, signOut, doc, setDoc, getDoc, collection, getDocs, deleteDoc, sendPasswordResetEmail, currentUser = null;
         let confirmationResult = null; 
 
         // --- DOM ELEMENTS ---
@@ -662,8 +695,18 @@
                 }
             });
 
+            // --- NEW: Profile & Save Button Wiring ---
             document.getElementById('btn-cloud-save').addEventListener('click', saveToCloud);
-            document.getElementById('btn-cloud-load').addEventListener('click', loadFromCloud);
+            document.getElementById('btn-cloud-load').addEventListener('click', openProfile);
+            document.getElementById('btn-refresh-list').addEventListener('click', openProfile);
+            
+            document.getElementById('btn-change-pass').addEventListener('click', async () => {
+                if (!currentUser || !currentUser.email) return alert("You need an email address to reset your password.");
+                try {
+                    await sendPasswordResetEmail(auth, currentUser.email);
+                    alert("Password reset email sent to " + currentUser.email);
+                } catch(e) { alert(e.message); }
+            });
 
             initZoomAndPan(); saveState(); initFirebase();
         }
@@ -694,6 +737,10 @@
                 doc = dbM.doc;
                 setDoc = dbM.setDoc;
                 getDoc = dbM.getDoc;
+                collection = dbM.collection;
+                getDocs = dbM.getDocs;
+                deleteDoc = dbM.deleteDoc;
+                sendPasswordResetEmail = authM.sendPasswordResetEmail;
 
                 // Initialize Invisible reCAPTCHA
                 window.recaptchaVerifier = new authM.RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
@@ -709,7 +756,7 @@
                             document.getElementById(tabs[s]).classList.toggle('active', s === key);
                             // Reset Tab colors if needed
                             document.getElementById(tabs[s]).style.background = (s === key) ? 'var(--primary)' : '#f8fafc';
-                            document.getElementById(tabs[s]).style.color = (s === key) ? 'black' : '#64748b';
+                            document.getElementById(tabs[s]).style.color = (s === key) ? 'white' : 'black';
                         });
                         document.getElementById(tabs[key]).style.background = 'var(--primary)';
                         document.getElementById(tabs[key]).style.color = 'white';
@@ -853,70 +900,125 @@
             } catch (e) { console.error("Firebase init failed:", e); }
         }
 
+        // --- NEW: Save with Project Name ---
         async function saveToCloud() {
-            if (!currentUser || !db) return alert("Please Login first.");
+            if (!currentUser) return;
+            if (!mapData || Object.keys(populationData).length === 0) return alert("Nothing to save! Please load a map and enter some data first.");
+            
+            const projectName = prompt("Enter a name for this project (e.g., Rewa_Sector_1):");
+            if (!projectName) return;
+
             try {
-                setStatus("Saving to Firestore...", false);
+                setStatus("Saving project...", false);
+                // We save to: artifacts > default-app-id > users > [UID] > projects > [ProjectName]
+                const projectDoc = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid, 'projects', projectName);
                 
-                const userDoc = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid);
-                
-                await setDoc(userDoc, {
+                await setDoc(projectDoc, {
+                    name: projectName,
                     populationData: populationData,
-                    mapDataString: JSON.stringify(mapData), // Bypasses Firestore nested array limits
-                    stylingMode: stylingMode, // Preserves your styling progress
-                    defaultTextStyle: defaultTextStyle, // Preserves your styling progress
-                    lastSaved: new Date().toISOString()
+                    mapDataString: JSON.stringify(mapData),
+                    stylingMode: stylingMode, 
+                    defaultTextStyle: defaultTextStyle,
+                    timestamp: new Date()
                 });
                 
-                setStatus("✓ Saved to Cloud!");
+                setStatus("✓ Project '" + projectName + "' saved!");
             } catch (e) {
-                console.error(e);
                 setStatus("Save failed: " + e.message, true);
             }
         }
 
-        async function loadFromCloud() {
-            if (!currentUser || !db) return alert("Please Login first.");
+        // --- NEW: Fetch and Show Profile/Projects ---
+        async function openProfile() {
+            const overlay = document.getElementById('profile-modal-overlay');
+            const listDiv = document.getElementById('project-list');
+            document.getElementById('prof-email').textContent = currentUser.email || currentUser.phoneNumber || "Guest User";
+            document.getElementById('user-initial').textContent = (currentUser.email || currentUser.phoneNumber || "U").charAt(0).toUpperCase();
+            overlay.style.display = 'flex';
+
+            listDiv.innerHTML = '<p style="text-align:center; font-size:0.8rem;">Loading projects...</p>';
+
             try {
-                setStatus("Loading from Firestore...", false);
+                // Query all documents in the user's projects sub-collection
+                const projectsCol = collection(db, 'artifacts', 'default-app-id', 'users', currentUser.uid, 'projects');
+                const querySnapshot = await getDocs(projectsCol);
                 
-                const userDoc = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid);
-                const docSnap = await getDoc(userDoc);
-                
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
+                listDiv.innerHTML = '';
+                if (querySnapshot.empty) {
+                    listDiv.innerHTML = '<p style="text-align:center; font-size:0.8rem; color:#94a3b8;">No projects found.</p>';
+                    return;
+                }
+
+                querySnapshot.forEach((projectDoc) => {
+                    const data = projectDoc.data();
+                    const item = document.createElement('div');
+                    item.style = "display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;";
+                    item.innerHTML = `
+                        <div>
+                            <strong style="font-size: 0.9rem; color: var(--text-main);">${data.name}</strong>
+                            <p style="font-size: 0.65rem; color: #94a3b8; margin:0;">Saved: ${data.timestamp?.toDate().toLocaleString() || 'Unknown'}</p>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="loadProject('${projectDoc.id}')" style="background: var(--primary); color:white; border:none; padding: 5px 10px; border-radius: 4px; font-size:0.7rem; cursor:pointer;">Load</button>
+                            <button onclick="renameProject('${projectDoc.id}')" style="background: #e2e8f0; color:#475569; border:none; padding: 5px 10px; border-radius: 4px; font-size:0.7rem; cursor:pointer;">Rename</button>
+                        </div>
+                    `;
+                    listDiv.appendChild(item);
+                });
+            } catch (e) {
+                listDiv.innerHTML = '<p style="color:red; font-size:0.7rem;">Error loading projects.</p>';
+            }
+        }
+
+        // Helper: Load specific project
+        window.loadProject = async (id) => {
+            try {
+                setStatus("Loading project...", false);
+                const projectDoc = await getDoc(doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid, 'projects', id));
+                if (projectDoc.exists()) {
+                    const data = projectDoc.data();
                     populationData = data.populationData || {};
                     
                     // Restoring styling configurations safely
                     if(data.stylingMode) stylingMode = data.stylingMode;
                     if(data.defaultTextStyle) Object.assign(defaultTextStyle, data.defaultTextStyle);
                     
-                    // Parse the string back into actual Map Data object
+                    // Parse Map Data
                     if (data.mapDataString) {
                         mapData = JSON.parse(data.mapDataString);
                     } else if (data.mapData) {
-                        // Fallback for old data structure
-                        mapData = data.mapData;
+                        mapData = data.mapData; // Fallback
                     }
                     
                     if (mapData && mapData.features) { mapData.features.forEach(f => { if (!f.textStyle) f.textStyle = { ...defaultTextStyle }; }); }
 
                     if (mapData) {
                         selectedGeomId = null; historyStack = []; historyIndex = -1;
-                        drawMapSVG();
-                        buildTable();
-                        setStatus("✓ Progress loaded!");
-                    } else {
-                        emptyState.style.display = 'block'; mapContainer.style.display = 'none';
+                        drawMapSVG(); buildTable();
+                        document.getElementById('profile-modal-overlay').style.display = 'none';
+                        setStatus("✓ Loaded Project: " + id);
                     }
-                } else {
-                    setStatus("No saved data found.", true);
                 }
-            } catch (e) {
-                console.error(e);
-                setStatus("Load failed: " + e.message, true);
+            } catch (e) { 
+                setStatus("Load failed: " + e.message, true); 
             }
-        }
+        };
+
+        // Helper: Rename project
+        window.renameProject = async (oldId) => {
+            const newName = prompt("Enter new name for this project:", oldId);
+            if (!newName || newName === oldId) return;
+
+            try {
+                const oldRef = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid, 'projects', oldId);
+                const newRef = doc(db, 'artifacts', 'default-app-id', 'users', currentUser.uid, 'projects', newName);
+                const oldSnap = await getDoc(oldRef);
+                
+                await setDoc(newRef, { ...oldSnap.data(), name: newName });
+                await deleteDoc(oldRef);
+                openProfile(); // Refresh list
+            } catch (e) { alert("Rename failed"); }
+        };
 
         // --- COLOR HELPERS ---
         function hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]; }
