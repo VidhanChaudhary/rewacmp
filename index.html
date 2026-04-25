@@ -64,6 +64,14 @@
         .mode-btn { flex: 1; border: none; background: none; padding: 6px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; cursor: pointer; color: var(--text-muted); transition: all 0.2s; }
         .mode-btn.active { background: white; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
+        /* Highlight the active auth method tab */
+        .method-btn.active {
+            background: var(--primary) !important;
+            color: white !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
+        }
+
         /* Data Table */
         .table-wrap { display: flex; flex-direction: column; flex: 1; min-height: 200px; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
         .table-wrap.fullscreen { position: fixed; top: 5vh; left: 15vw; right: 15vw; bottom: 5vh; z-index: 1000; background: #ffffff; padding: 25px; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6), 0 20px 25px -5px rgba(0,0,0,0.2); }
@@ -722,22 +730,36 @@
                     }
                 };
 
-                // --- METHOD 1: EMAIL & PASSWORD ---
+                // --- PREFERRED EMAIL & PASSWORD LOGIC ---
                 document.getElementById('btn-login-pw').onclick = async () => {
                     const email = document.getElementById('auth-email-pw').value;
                     const pass = document.getElementById('auth-password').value;
                     const errEl = document.getElementById('auth-error');
-                    errEl.style.display = 'none';
+                    
+                    if (!email || !pass) {
+                        errEl.textContent = "Please enter both email and password.";
+                        errEl.style.display = 'block';
+                        return;
+                    }
+
                     try {
+                        // Step 1: Attempt to Sign In
                         await authM.signInWithEmailAndPassword(auth, email, pass);
                         document.getElementById('auth-modal-overlay').style.display = 'none';
                     } catch (e) {
+                        // Step 2: If user doesn't exist, Create Account automatically
                         if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
                             try {
                                 await authM.createUserWithEmailAndPassword(auth, email, pass);
                                 document.getElementById('auth-modal-overlay').style.display = 'none';
-                            } catch (err) { errEl.textContent = err.message.replace('Firebase: ', ''); errEl.style.display = 'block'; }
-                        } else { errEl.textContent = e.message.replace('Firebase: ', ''); errEl.style.display = 'block'; }
+                            } catch (signupError) {
+                                errEl.textContent = signupError.message.replace('Firebase: ', '');
+                                errEl.style.display = 'block';
+                            }
+                        } else {
+                            errEl.textContent = e.message.replace('Firebase: ', '');
+                            errEl.style.display = 'block';
+                        }
                     }
                 };
 
