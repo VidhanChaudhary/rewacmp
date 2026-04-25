@@ -183,15 +183,22 @@
     <div id="auth-modal-overlay">
         <div id="auth-modal">
             <button id="btn-close-auth" class="auth-close">×</button>
-            <h2 style="margin-bottom: 20px; text-align: center;">Login / Sign Up</h2>
+            <h2 style="margin-bottom: 20px; text-align: center; font-size: 1.2rem;">Login / Sign Up</h2>
             
-            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                <button id="toggle-email" style="flex: 1; padding: 8px; cursor: pointer; border-radius: 6px; border: 1px solid var(--primary); background: var(--primary); color: white;">Email Link</button>
-                <button id="toggle-phone" style="flex: 1; padding: 8px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8fafc;">Phone OTP</button>
+            <div style="display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button id="toggle-pw" class="method-btn active" style="flex: 1; padding: 8px; font-size: 0.7rem; background: var(--primary); color: white; border-radius: 6px; border: 1px solid var(--primary); cursor: pointer;">Password</button>
+                <button id="toggle-email" class="method-btn" style="flex: 1; padding: 8px; font-size: 0.7rem; background: #f8fafc; color: black; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">Magic Link</button>
+                <button id="toggle-phone" class="method-btn" style="flex: 1; padding: 8px; font-size: 0.7rem; background: #f8fafc; color: black; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">Phone OTP</button>
             </div>
 
-            <div id="email-section">
-                <input type="email" id="auth-email" class="auth-input" placeholder="Email Address">
+            <div id="pw-section">
+                <input type="email" id="auth-email-pw" class="auth-input" placeholder="Email Address">
+                <input type="password" id="auth-password" class="auth-input" placeholder="Password">
+                <button id="btn-login-pw" class="auth-btn">Login / Sign Up</button>
+            </div>
+
+            <div id="email-section" style="display: none;">
+                <input type="email" id="auth-email-link" class="auth-input" placeholder="Email Address">
                 <button id="btn-send-link" class="auth-btn">Send Login Link</button>
             </div>
 
@@ -207,7 +214,7 @@
                 </div>
             </div>
 
-            <div id="auth-error" style="color: #ef4444; font-size: 0.8rem; text-align: center; display: none; margin-top: 10px;"></div>
+            <div id="auth-error" style="color: #ef4444; font-size: 0.75rem; text-align: center; display: none; margin-top: 10px;"></div>
         </div>
     </div>
 
@@ -664,7 +671,7 @@
                 auth = authM.getAuth(app); 
                 db = dbM.getFirestore(app);
 
-                // Expose explicitly for the Cloud Save functions in the wider scope
+                // --- GLOBAL EXPORTS NEEDED FOR CLOUD SAVE/LOAD ---
                 signOut = authM.signOut;
                 doc = dbM.doc;
                 setDoc = dbM.setDoc;
@@ -673,33 +680,55 @@
                 // Initialize Invisible reCAPTCHA
                 window.recaptchaVerifier = new authM.RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
 
-                // UI Logic for Toggling between Email and Phone
-                const eBtn = document.getElementById('toggle-email'), pBtn = document.getElementById('toggle-phone');
-                const eSec = document.getElementById('email-section'), pSec = document.getElementById('phone-section');
+                // UI Tab Switching Logic
+                const sections = { pw: 'pw-section', link: 'email-section', phone: 'phone-section' };
+                const tabs = { pw: 'toggle-pw', link: 'toggle-email', phone: 'toggle-phone' };
 
-                eBtn.onclick = () => {
-                    eBtn.style.background = 'var(--primary)'; eBtn.style.color = 'white';
-                    pBtn.style.background = '#f8fafc'; pBtn.style.color = 'black';
-                    eSec.style.display = 'block'; pSec.style.display = 'none';
-                };
-                pBtn.onclick = () => {
-                    pBtn.style.background = 'var(--primary)'; pBtn.style.color = 'white';
-                    eBtn.style.background = '#f8fafc'; eBtn.style.color = 'black';
-                    pSec.style.display = 'block'; eSec.style.display = 'none';
+                Object.keys(tabs).forEach(key => {
+                    document.getElementById(tabs[key]).onclick = () => {
+                        Object.keys(sections).forEach(s => {
+                            document.getElementById(sections[s]).style.display = (s === key) ? 'block' : 'none';
+                            document.getElementById(tabs[s]).classList.toggle('active', s === key);
+                            // Reset Tab colors if needed
+                            document.getElementById(tabs[s]).style.background = (s === key) ? 'var(--primary)' : '#f8fafc';
+                            document.getElementById(tabs[s]).style.color = (s === key) ? 'black' : '#64748b';
+                        });
+                        document.getElementById(tabs[key]).style.background = 'var(--primary)';
+                        document.getElementById(tabs[key]).style.color = 'white';
+                    };
+                });
+
+                // --- METHOD 1: EMAIL & PASSWORD ---
+                document.getElementById('btn-login-pw').onclick = async () => {
+                    const email = document.getElementById('auth-email-pw').value;
+                    const pass = document.getElementById('auth-password').value;
+                    const errEl = document.getElementById('auth-error');
+                    errEl.style.display = 'none';
+                    try {
+                        await authM.signInWithEmailAndPassword(auth, email, pass);
+                        document.getElementById('auth-modal-overlay').style.display = 'none';
+                    } catch (e) {
+                        if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential') {
+                            try {
+                                await authM.createUserWithEmailAndPassword(auth, email, pass);
+                                document.getElementById('auth-modal-overlay').style.display = 'none';
+                            } catch (err) { errEl.textContent = err.message.replace('Firebase: ', ''); errEl.style.display = 'block'; }
+                        } else { errEl.textContent = e.message.replace('Firebase: ', ''); errEl.style.display = 'block'; }
+                    }
                 };
 
-                // Method 1: Send Email Link
+                // --- METHOD 2: EMAIL LINK (MAGIC LINK) ---
                 document.getElementById('btn-send-link').onclick = async () => {
-                    const email = document.getElementById('auth-email').value;
+                    const email = document.getElementById('auth-email-link').value;
                     try {
                         await authM.sendSignInLinkToEmail(auth, email, { url: window.location.href, handleCodeInApp: true });
                         window.localStorage.setItem('emailForSignIn', email);
-                        alert('Link sent to ' + email);
+                        alert('Magic Link sent to ' + email);
                         document.getElementById('auth-modal-overlay').style.display = 'none';
                     } catch (e) { alert(e.message); }
                 };
 
-                // Method 2: Phone OTP
+                // --- METHOD 3: PHONE OTP ---
                 document.getElementById('btn-send-otp').onclick = async () => {
                     const phone = document.getElementById('auth-phone').value;
                     try {
@@ -717,7 +746,7 @@
                     } catch (e) { alert("Invalid OTP"); }
                 };
 
-                // Handle Email Link Return
+                // Handle return from Magic Link
                 if (authM.isSignInWithEmailLink(auth, window.location.href)) {
                     let email = window.localStorage.getItem('emailForSignIn') || window.prompt('Confirm your email:');
                     await authM.signInWithEmailLink(auth, email, window.location.href);
@@ -725,12 +754,11 @@
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
-                // Auth State Observer
                 authM.onAuthStateChanged(auth, (user) => {
                     currentUser = user;
                     document.getElementById('auth-ui-logged-out').style.display = user ? 'none' : 'block';
                     document.getElementById('auth-ui-logged-in').style.display = user ? 'flex' : 'none';
-                    if (user) document.getElementById('user-email-display').textContent = user.email || user.phoneNumber;
+                    if (user) document.getElementById('user-email-display').textContent = user.email || user.phoneNumber || "User";
                 });
 
             } catch (e) { console.error("Firebase init failed:", e); }
