@@ -183,14 +183,31 @@
     <div id="auth-modal-overlay">
         <div id="auth-modal">
             <button id="btn-close-auth" class="auth-close">×</button>
-            <h2 id="auth-modal-title">Login with Email Link</h2>
+            <h2 style="margin-bottom: 20px; text-align: center;">Login / Sign Up</h2>
             
-            <div>
-                <input type="email" id="auth-email" class="auth-input" placeholder="Enter your email" required>
-                <button id="btn-submit-auth" class="auth-btn">Send Login Link</button>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button id="toggle-email" style="flex: 1; padding: 8px; cursor: pointer; border-radius: 6px; border: 1px solid var(--primary); background: var(--primary); color: white;">Email Link</button>
+                <button id="toggle-phone" style="flex: 1; padding: 8px; cursor: pointer; border-radius: 6px; border: 1px solid #ccc; background: #f8fafc;">Phone OTP</button>
             </div>
 
-            <div id="auth-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 10px; text-align: center; display: none;"></div>
+            <div id="email-section">
+                <input type="email" id="auth-email" class="auth-input" placeholder="Email Address">
+                <button id="btn-send-link" class="auth-btn">Send Login Link</button>
+            </div>
+
+            <div id="phone-section" style="display: none;">
+                <div id="phone-input-step">
+                    <input type="tel" id="auth-phone" class="auth-input" placeholder="+91 9876543210">
+                    <div id="recaptcha-container"></div>
+                    <button id="btn-send-otp" class="auth-btn">Send OTP</button>
+                </div>
+                <div id="otp-verify-step" style="display: none;">
+                    <input type="text" id="auth-otp" class="auth-input" placeholder="Enter 6-digit OTP">
+                    <button id="btn-verify-otp" class="auth-btn">Verify & Login</button>
+                </div>
+            </div>
+
+            <div id="auth-error" style="color: #ef4444; font-size: 0.8rem; text-align: center; display: none; margin-top: 10px;"></div>
         </div>
     </div>
 
@@ -482,6 +499,7 @@
 
         // Auth & Firebase State
         let auth, db, signOut, doc, setDoc, getDoc, currentUser = null;
+        let confirmationResult = null; // Added to handle Phone OTP universally
 
         // --- DOM ELEMENTS ---
         const fileUpload = document.getElementById('file-upload'), statusMsg = document.getElementById('status-msg');
@@ -628,9 +646,9 @@
         // --- Firebase Initialization & Auto-Login Logic ---
         async function initFirebase() {
             try {
-                const appModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
-                const authModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
-                const dbModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+                const appM = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
+                const authM = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                const dbM = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
                 const firebaseConfig = {
                     apiKey: "AIzaSyC-bz7BBVdppJWB1wB1f57vMX1LhDAlBxg",
@@ -638,73 +656,81 @@
                     projectId: "rewacmp",
                     storageBucket: "rewacmp.firebasestorage.app",
                     messagingSenderId: "832105705350",
-                    appId: "1:832105705350:web:85aebb706910364e668607"
+                    appId: "1:832105705350:web:85aebb706910364e668607",
+                    measurementId: "G-K9B5P4GEZD"
                 };
 
-                const app = appModule.initializeApp(firebaseConfig);
-                auth = authModule.getAuth(app);
-                db = dbModule.getFirestore(app);
-                
-                // Expose methods needed by cloud save/load
-                signOut = authModule.signOut;
-                doc = dbModule.doc; 
-                setDoc = dbModule.setDoc; 
-                getDoc = dbModule.getDoc;
+                const app = appM.initializeApp(firebaseConfig);
+                auth = authM.getAuth(app); 
+                db = dbM.getFirestore(app);
 
-                // CHECK IF USER IS RETURNING FROM EMAIL LINK
-                if (authModule.isSignInWithEmailLink(auth, window.location.href)) {
-                    let email = window.localStorage.getItem('emailForSignIn');
-                    if (!email) {
-                        email = window.prompt('Please provide your email for confirmation');
-                    }
-                    await authModule.signInWithEmailLink(auth, email, window.location.href);
+                // Expose explicitly for the Cloud Save functions in the wider scope
+                signOut = authM.signOut;
+                doc = dbM.doc;
+                setDoc = dbM.setDoc;
+                getDoc = dbM.getDoc;
+
+                // Initialize Invisible reCAPTCHA
+                window.recaptchaVerifier = new authM.RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
+
+                // UI Logic for Toggling between Email and Phone
+                const eBtn = document.getElementById('toggle-email'), pBtn = document.getElementById('toggle-phone');
+                const eSec = document.getElementById('email-section'), pSec = document.getElementById('phone-section');
+
+                eBtn.onclick = () => {
+                    eBtn.style.background = 'var(--primary)'; eBtn.style.color = 'white';
+                    pBtn.style.background = '#f8fafc'; pBtn.style.color = 'black';
+                    eSec.style.display = 'block'; pSec.style.display = 'none';
+                };
+                pBtn.onclick = () => {
+                    pBtn.style.background = 'var(--primary)'; pBtn.style.color = 'white';
+                    eBtn.style.background = '#f8fafc'; eBtn.style.color = 'black';
+                    pSec.style.display = 'block'; eSec.style.display = 'none';
+                };
+
+                // Method 1: Send Email Link
+                document.getElementById('btn-send-link').onclick = async () => {
+                    const email = document.getElementById('auth-email').value;
+                    try {
+                        await authM.sendSignInLinkToEmail(auth, email, { url: window.location.href, handleCodeInApp: true });
+                        window.localStorage.setItem('emailForSignIn', email);
+                        alert('Link sent to ' + email);
+                        document.getElementById('auth-modal-overlay').style.display = 'none';
+                    } catch (e) { alert(e.message); }
+                };
+
+                // Method 2: Phone OTP
+                document.getElementById('btn-send-otp').onclick = async () => {
+                    const phone = document.getElementById('auth-phone').value;
+                    try {
+                        confirmationResult = await authM.signInWithPhoneNumber(auth, phone, window.recaptchaVerifier);
+                        document.getElementById('phone-input-step').style.display = 'none';
+                        document.getElementById('otp-verify-step').style.display = 'block';
+                    } catch (e) { alert("SMS Error: Check if billing or test numbers are set."); }
+                };
+
+                document.getElementById('btn-verify-otp').onclick = async () => {
+                    const code = document.getElementById('auth-otp').value;
+                    try {
+                        await confirmationResult.confirm(code);
+                        document.getElementById('auth-modal-overlay').style.display = 'none';
+                    } catch (e) { alert("Invalid OTP"); }
+                };
+
+                // Handle Email Link Return
+                if (authM.isSignInWithEmailLink(auth, window.location.href)) {
+                    let email = window.localStorage.getItem('emailForSignIn') || window.prompt('Confirm your email:');
+                    await authM.signInWithEmailLink(auth, email, window.location.href);
                     window.localStorage.removeItem('emailForSignIn');
-                    // Clean the URL
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
-                authModule.onAuthStateChanged(auth, (user) => {
+                // Auth State Observer
+                authM.onAuthStateChanged(auth, (user) => {
                     currentUser = user;
-                    const loggedOutUi = document.getElementById('auth-ui-logged-out');
-                    const loggedInUi = document.getElementById('auth-ui-logged-in');
-                    if (user) {
-                        loggedOutUi.style.display = 'none';
-                        loggedInUi.style.display = 'flex';
-                        document.getElementById('user-email-display').textContent = user.email || "User";
-                    } else {
-                        loggedOutUi.style.display = 'block';
-                        loggedInUi.style.display = 'none';
-                    }
-                });
-
-                // Update the Login Button to send the link
-                document.getElementById('btn-submit-auth').addEventListener('click', async () => {
-                    const email = document.getElementById('auth-email').value;
-                    if(!email) return alert("Please enter an email address.");
-                    
-                    const actionCodeSettings = {
-                        url: window.location.href, // Points back to your GitHub page
-                        handleCodeInApp: true
-                    };
-
-                    try {
-                        const btn = document.getElementById('btn-submit-auth');
-                        btn.textContent = "Sending...";
-                        btn.disabled = true;
-
-                        await authModule.sendSignInLinkToEmail(auth, email, actionCodeSettings);
-                        window.localStorage.setItem('emailForSignIn', email);
-                        alert('Check your email! We sent you a login link.');
-                        document.getElementById('auth-modal-overlay').style.display = 'none';
-                        
-                        btn.textContent = "Send Login Link";
-                        btn.disabled = false;
-                    } catch (error) {
-                        alert(error.message);
-                        const btn = document.getElementById('btn-submit-auth');
-                        btn.textContent = "Send Login Link";
-                        btn.disabled = false;
-                    }
+                    document.getElementById('auth-ui-logged-out').style.display = user ? 'none' : 'block';
+                    document.getElementById('auth-ui-logged-in').style.display = user ? 'flex' : 'none';
+                    if (user) document.getElementById('user-email-display').textContent = user.email || user.phoneNumber;
                 });
 
             } catch (e) { console.error("Firebase init failed:", e); }
