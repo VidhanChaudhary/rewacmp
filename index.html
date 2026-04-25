@@ -29,6 +29,14 @@
         .sidebar-header p { font-size: 0.8rem; opacity: 0.8; }
         .sidebar-content { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; flex: 1; }
 
+        /* Menu Button */
+        #btn-main-menu { background: rgba(255,255,255,0.1); border: none; border-radius: 6px; color: white; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        #btn-main-menu:hover { background: rgba(255,255,255,0.2); }
+
+        /* Floating Menu Styling */
+        #styling-menu { position: absolute; top: 70px; right: 10px; width: 280px; background: white; border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); z-index: 100; padding: 15px; display: none; flex-direction: column; gap: 15px; animation: slideIn 0.2s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
         label.section-title { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 8px; }
         
         /* Upload Button */
@@ -144,6 +152,18 @@
         .text-primary { color: var(--primary); }
         .divider { width: 1px; height: 16px; background: #cbd5e1; }
 
+        /* Auth Modal Styling */
+        #auth-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; display: none; align-items: center; justify-content: center; }
+        #auth-modal { background: white; padding: 30px; border-radius: 12px; width: 320px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); position: relative; }
+        #auth-modal h2 { margin-bottom: 20px; text-align: center; color: var(--text-main); font-size: 1.5rem; }
+        .auth-input { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; outline: none; }
+        .auth-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1); }
+        .auth-btn { width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 0.9rem; }
+        .auth-btn:hover { background: var(--primary-hover); }
+        .auth-switch { text-align: center; margin-top: 15px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer; }
+        .auth-switch:hover { color: var(--primary); text-decoration: underline; }
+        .auth-close { position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); line-height: 1; }
+
         /* Icons (Inline SVG) */
         .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -159,15 +179,113 @@
 </head>
 <body>
 
+    <!-- Auth Modal Overlay -->
+    <div id="auth-modal-overlay">
+        <div id="auth-modal">
+            <button id="btn-close-auth" class="auth-close">×</button>
+            <h2 id="auth-modal-title">Sign In</h2>
+            <input type="email" id="auth-email" class="auth-input" placeholder="Email Address">
+            <input type="password" id="auth-password" class="auth-input" placeholder="Password">
+            <button id="btn-submit-auth" class="auth-btn">Sign In</button>
+            <div id="auth-switch-mode" class="auth-switch">Need an account? Sign Up</div>
+            <div id="auth-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 10px; text-align: center; display: none;"></div>
+        </div>
+    </div>
+
     <!-- SIDEBAR -->
     <div id="sidebar">
-        <div class="sidebar-header">
-            <div>
-                <h1>
-                    <svg class="icon" viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
-                    Rewa GIS Map
-                </h1>
-                <p>Offline True Boundary Renderer</p>
+        <div class="sidebar-header" style="flex-direction: column; align-items: stretch;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                <div>
+                    <h1>
+                        <svg class="icon" viewBox="0 0 24 24"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon><line x1="9" y1="3" x2="9" y2="18"></line><line x1="15" y1="6" x2="15" y2="21"></line></svg>
+                        Rewa GIS Map
+                    </h1>
+                    <p>Offline True Boundary Renderer</p>
+                </div>
+                <button id="btn-main-menu" title="Styling Options">
+                    <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                </button>
+            </div>
+            
+            <!-- Auth UI -->
+            <div id="auth-ui-logged-out" style="margin-top: 15px;">
+                <button id="btn-open-login" class="upload-btn" style="padding: 8px; font-size: 0.8rem; background: #4f46e5; color: white; border: none; margin: 0;">Login / Sign Up to Cloud Save</button>
+            </div>
+            <div id="auth-ui-logged-in" style="margin-top: 15px; display: none; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.8); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color);">
+                <span id="user-email-display" style="font-size: 0.8rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px;">
+                    user@example.com
+                </span>
+                <div style="display: flex; gap: 5px;">
+                    <button id="btn-cloud-save" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; margin: 0; width: auto; color: white; background: var(--primary); border: none;" title="Save to Cloud">Save</button>
+                    <button id="btn-cloud-load" class="upload-btn" style="padding: 4px 8px; font-size: 0.7rem; margin: 0; width: auto; color: var(--primary); background: #eef2ff; border-color: #c7d2fe;" title="Load from Cloud">Load</button>
+                    <button id="btn-sign-out" title="Sign Out" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 2px; margin-left: 4px; font-weight: bold; font-size: 1rem;">✕</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- HIDDEN STYLING MENU (Floating) -->
+        <div id="styling-menu">
+            <label class="section-title">Geography & Text Styling</label>
+            
+            <div class="mode-toggle-wrap">
+                <button id="btn-mode-individual" class="mode-btn active">Individual</button>
+                <button id="btn-mode-all" class="mode-btn">Edit All</button>
+            </div>
+
+            <div class="input-box">
+                <div style="display: flex; justify-content: space-between;">
+                    <label>Text Size</label>
+                    <span id="text-size-val" style="font-size: 0.75rem; font-weight: bold; color: var(--primary);">12px</span>
+                </div>
+                <input type="range" id="text-size-slider" min="6" max="32" value="12" style="width: 100%;">
+            </div>
+
+            <div class="input-box">
+                <div style="display: flex; justify-content: space-between;">
+                    <label>Outline Thickness</label>
+                    <span id="text-outline-width-val" style="font-size: 0.75rem; font-weight: bold; color: var(--primary);">2.5px</span>
+                </div>
+                <input type="range" id="text-outline-width-slider" min="0" max="6" step="0.1" value="2.5" style="width: 100%;">
+            </div>
+
+            <div class="input-box">
+                <div style="display: flex; justify-content: space-between;">
+                    <label>Border Thickness</label>
+                    <span id="border-thickness-val" style="font-size: 0.75rem; font-weight: bold; color: var(--primary);">1.5px</span>
+                </div>
+                <input type="range" id="border-thickness-slider" min="0" max="10" step="0.1" value="1.5" style="width: 100%;">
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div class="input-box">
+                    <label>Fill Color</label>
+                    <input type="color" id="fill-color-picker" value="#cbd5e1" style="width: 100%; height: 24px; padding:0; cursor:pointer;">
+                </div>
+                <div class="input-box">
+                    <label>Border Color</label>
+                    <input type="color" id="border-color-picker" value="#ffffff" style="width: 100%; height: 24px; padding:0; cursor:pointer;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px;">
+                <div class="input-box">
+                    <label>Text Color</label>
+                    <input type="color" id="text-color-picker" value="#ffffff" style="width: 100%; height: 24px; padding:0; cursor:pointer;">
+                </div>
+                <div class="input-box">
+                    <label>Outline Color</label>
+                    <input type="color" id="outline-color-picker" value="#000000" style="width: 100%; height: 24px; padding:0; cursor:pointer;">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px;">
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; cursor: pointer; font-weight: bold;">
+                    <input type="checkbox" id="text-bold-check" checked> Bold
+                </label>
+                <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; cursor: pointer; font-weight: bold;">
+                    <input type="checkbox" id="text-outline-check" checked> Outline
+                </label>
             </div>
         </div>
 
@@ -216,69 +334,6 @@
                     </div>
                 </div>
                 <p id="editor-help" class="help-text">Click any ward on the map to select it. You can double-click text on the map to inline-edit.</p>
-            </div>
-
-            <!-- Global Styling Controls -->
-            <div id="styling-controls-panel" style="display: none;">
-                <label class="section-title">Geography & Text Styling</label>
-                
-                <!-- Styling Mode Toggle -->
-                <div class="mode-toggle-wrap">
-                    <button id="btn-mode-individual" class="mode-btn active" title="Apply styles only to selected ward">Individual</button>
-                    <button id="btn-mode-all" class="mode-btn" title="Apply styles to every ward on map">Edit All</button>
-                </div>
-
-                <!-- Font Size -->
-                <div class="input-box" style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <label>Text Size</label>
-                        <span id="text-size-val" style="font-size: 0.75rem; font-weight: bold; color: var(--primary);">12px</span>
-                    </div>
-                    <input type="range" id="text-size-slider" min="6" max="32" value="12" style="width: 100%; cursor: pointer; margin-top: 4px;">
-                </div>
-
-                <!-- Text Outline Thickness -->
-                <div class="input-box" style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <label>Outline Thickness</label>
-                        <span id="text-outline-width-val" style="font-size: 0.75rem; font-weight: bold; color: var(--primary);">2.5px</span>
-                    </div>
-                    <input type="range" id="text-outline-width-slider" min="0" max="6" step="0.1" value="2.5" style="width: 100%; cursor: pointer; margin-top: 4px;">
-                </div>
-
-                <!-- Border Thickness -->
-                <div class="input-box" style="margin-bottom: 10px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <label>Border Thickness</label>
-                        <span id="border-thickness-val" style="font-size: 0.75rem; font-weight: bold; color: var(--primary);">1.5px</span>
-                    </div>
-                    <input type="range" id="border-thickness-slider" min="0" max="10" step="0.1" value="1.5" style="width: 100%; cursor: pointer; margin-top: 4px;">
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-                    <div class="input-box">
-                        <label>Text Color</label>
-                        <input type="color" id="text-color-picker" value="#ffffff" style="width: 100%; height: 28px; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; padding: 0;">
-                    </div>
-                    <div class="input-box">
-                        <label>Outline Color</label>
-                        <input type="color" id="outline-color-picker" value="#000000" style="width: 100%; height: 28px; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; padding: 0;">
-                    </div>
-                </div>
-
-                <div class="input-box" style="margin-bottom: 12px;">
-                    <label>Border Color</label>
-                    <input type="color" id="border-color-picker" value="#ffffff" style="width: 100%; height: 28px; border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer; padding: 0;">
-                </div>
-
-                <div style="display: flex; gap: 15px;">
-                    <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="checkbox" id="text-bold-check" checked> Bold Text
-                    </label>
-                    <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main);">
-                        <input type="checkbox" id="text-outline-check" checked> Show Outline
-                    </label>
-                </div>
             </div>
 
             <!-- Data Table -->
@@ -353,8 +408,11 @@
             </div>
 
             <div class="color-scale">
-                <label class="section-title">Color Scale</label>
-                <div class="scale-labels"><span>Low Pop</span><span>High Pop</span></div>
+                <label class="section-title">Color Scale (Population)</label>
+                <div class="scale-labels">
+                    <span id="legend-min">Low Pop</span>
+                    <span id="legend-max">High Pop</span>
+                </div>
                 <div class="scale-bar"></div>
             </div>
         </div>
@@ -397,6 +455,11 @@
 
     <!-- JAVASCRIPT LOGIC -->
     <script>
+        // --- CONSTANTS ---
+        const MIN_COLOR = '#fde0dd';
+        const MAX_COLOR = '#c51b8a';
+        const SVG_NS = "http://www.w3.org/2000/svg";
+
         // --- STATE ---
         let populationData = {};
         let mapData = null; 
@@ -416,21 +479,25 @@
 
         // Styling State
         let stylingMode = 'individual'; 
-        const defaultTextStyle = { size: 12, borderWidth: 1.5, borderColor: '#ffffff', color: '#ffffff', outlineColor: '#000000', outlineWidth: 2.5, bold: true, outline: true };
+        const defaultTextStyle = { size: 12, borderWidth: 1.5, borderColor: '#ffffff', fillColor: null, color: '#ffffff', outlineColor: '#000000', outlineWidth: 2.5, bold: true, outline: true };
 
         let tableSearchQuery = "";
         let sortConfig = { column: null, direction: 'asc' };
         let historyStack = [];
         let historyIndex = -1;
 
-        const MIN_COLOR = '#fde0dd', MAX_COLOR = '#c51b8a', SVG_NS = "http://www.w3.org/2000/svg";
+        // Auth & Firebase State
+        let auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, doc, setDoc, getDoc, currentUser = null;
+        let isSignUpMode = false;
 
         // --- DOM ELEMENTS ---
         const fileUpload = document.getElementById('file-upload'), statusMsg = document.getElementById('status-msg');
         const mapContainer = document.getElementById('map-container'), emptyState = document.getElementById('empty-state');
         const mapSvg = document.getElementById('map-svg'), mapGroup = document.getElementById('map-group');
         const tooltip = document.getElementById('tooltip'), ttWard = document.getElementById('tt-ward'), ttPop = document.getElementById('tt-pop');
-        const selectedWardPanel = document.getElementById('selected-ward-panel'), stylingControlsPanel = document.getElementById('styling-controls-panel');
+        const selectedWardPanel = document.getElementById('selected-ward-panel');
+        const stylingMenu = document.getElementById('styling-menu');
+        const btnMainMenu = document.getElementById('btn-main-menu');
         const editorUi = document.getElementById('editor-ui'), editorHelp = document.getElementById('editor-help');
         const editWardNo = document.getElementById('edit-ward-no'), editWardPop = document.getElementById('edit-ward-pop');
         const btnClearWard = document.getElementById('btn-clear-ward'), btnExportImg = document.getElementById('btn-export-img'), btnExportPdf = document.getElementById('btn-export-pdf');
@@ -445,8 +512,12 @@
         const textOutlineWidthSlider = document.getElementById('text-outline-width-slider'), textOutlineWidthVal = document.getElementById('text-outline-width-val');
         const borderThicknessSlider = document.getElementById('border-thickness-slider'), borderThicknessVal = document.getElementById('border-thickness-val');
         const textColorPicker = document.getElementById('text-color-picker'), outlineColorPicker = document.getElementById('outline-color-picker'), borderColorPicker = document.getElementById('border-color-picker');
+        const fillColorPicker = document.getElementById('fill-color-picker');
         const textBoldCheck = document.getElementById('text-bold-check'), textOutlineCheck = document.getElementById('text-outline-check');
         const importWardCsv = document.getElementById('import-wardno-csv'), importPopCsv = document.getElementById('import-pop-csv');
+        
+        // Legend Elements
+        const legendMin = document.getElementById('legend-min'), legendMax = document.getElementById('legend-max');
 
         // --- INITIALIZATION ---
         function init() {
@@ -476,7 +547,17 @@
                 }
             });
 
+            if (btnMainMenu && stylingMenu) {
+                btnMainMenu.addEventListener('click', (e) => { 
+                    e.stopPropagation(); 
+                    stylingMenu.style.display = stylingMenu.style.display === 'flex' ? 'none' : 'flex'; 
+                });
+            }
+
             document.addEventListener('click', (e) => { 
+                if (stylingMenu && !stylingMenu.contains(e.target) && e.target !== btnMainMenu) {
+                    stylingMenu.style.display = 'none'; 
+                }
                 if (!e.target.closest('.th-menu-wrap')) document.querySelectorAll('.th-menu-dropdown').forEach(d => d.classList.remove('show'));
             });
 
@@ -502,9 +583,19 @@
             textSizeSlider.addEventListener('input', (e) => { textSizeVal.textContent = e.target.value + 'px'; updateStyles(ts => ts.size = parseInt(e.target.value)); });
             textOutlineWidthSlider.addEventListener('input', (e) => { textOutlineWidthVal.textContent = e.target.value + 'px'; updateStyles(ts => ts.outlineWidth = parseFloat(e.target.value)); });
             borderThicknessSlider.addEventListener('input', (e) => { borderThicknessVal.textContent = e.target.value + 'px'; updateStyles(ts => ts.borderWidth = parseFloat(e.target.value)); });
+            
+            fillColorPicker.addEventListener('input', (e) => updateStyles(ts => ts.fillColor = e.target.value));
+            fillColorPicker.addEventListener('change', () => saveState());
+            
             textColorPicker.addEventListener('input', (e) => updateStyles(ts => ts.color = e.target.value));
+            textColorPicker.addEventListener('change', () => saveState());
+
             outlineColorPicker.addEventListener('input', (e) => updateStyles(ts => ts.outlineColor = e.target.value));
+            outlineColorPicker.addEventListener('change', () => saveState());
+
             borderColorPicker.addEventListener('input', (e) => updateStyles(ts => ts.borderColor = e.target.value));
+            borderColorPicker.addEventListener('change', () => saveState());
+
             textBoldCheck.addEventListener('change', (e) => { updateStyles(ts => ts.bold = e.target.checked); saveState(); });
             textOutlineCheck.addEventListener('change', (e) => { updateStyles(ts => ts.outline = e.target.checked); saveState(); });
 
@@ -519,10 +610,121 @@
                 else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
             });
 
-            initZoomAndPan(); saveState();
+            // Auth Modal Events
+            document.getElementById('btn-open-login').addEventListener('click', () => { document.getElementById('auth-modal-overlay').style.display = 'flex'; document.getElementById('auth-error').style.display = 'none'; });
+            document.getElementById('btn-close-auth').addEventListener('click', () => document.getElementById('auth-modal-overlay').style.display = 'none');
+            document.getElementById('auth-switch-mode').addEventListener('click', () => {
+                isSignUpMode = !isSignUpMode;
+                document.getElementById('auth-modal-title').textContent = isSignUpMode ? "Sign Up" : "Sign In";
+                document.getElementById('btn-submit-auth').textContent = isSignUpMode ? "Sign Up" : "Sign In";
+                document.getElementById('auth-switch-mode').textContent = isSignUpMode ? "Already have an account? Sign In" : "Need an account? Sign Up";
+                document.getElementById('auth-error').style.display = 'none';
+            });
+
+            document.getElementById('btn-submit-auth').addEventListener('click', async () => {
+                if (!auth) return alert("Cloud storage not loaded.");
+                const email = document.getElementById('auth-email').value.trim();
+                const pass = document.getElementById('auth-password').value;
+                const errEl = document.getElementById('auth-error');
+                errEl.style.display = 'none';
+                try {
+                    setStatus("Authenticating...", false);
+                    if (isSignUpMode) await createUserWithEmailAndPassword(auth, email, pass);
+                    else await signInWithEmailAndPassword(auth, email, pass);
+                    document.getElementById('auth-modal-overlay').style.display = 'none';
+                    setStatus("Successfully logged in.", false);
+                } catch (e) {
+                    errEl.textContent = e.message.replace('Firebase: ', '');
+                    errEl.style.display = 'block';
+                    setStatus("Authentication failed.", true);
+                }
+            });
+
+            document.getElementById('btn-sign-out').addEventListener('click', async () => {
+                if (auth) {
+                    await signOut(auth);
+                    setStatus("Signed out successfully.", false);
+                }
+            });
+
+            document.getElementById('btn-cloud-save').addEventListener('click', saveToCloud);
+            document.getElementById('btn-cloud-load').addEventListener('click', loadFromCloud);
+
+            initZoomAndPan(); saveState(); initFirebase();
         }
 
+        async function initFirebase() {
+            try {
+                const appModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
+                const authModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                const firestoreModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+
+                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+                if (!firebaseConfig) { console.warn("Firebase not configured."); return; }
+
+                const app = appModule.initializeApp(firebaseConfig);
+                auth = authModule.getAuth(app); db = firestoreModule.getFirestore(app);
+                createUserWithEmailAndPassword = authModule.createUserWithEmailAndPassword;
+                signInWithEmailAndPassword = authModule.signInWithEmailAndPassword;
+                signOut = authModule.signOut;
+                doc = firestoreModule.doc; setDoc = firestoreModule.setDoc; getDoc = firestoreModule.getDoc;
+
+                authModule.onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    const loggedOutUi = document.getElementById('auth-ui-logged-out');
+                    const loggedInUi = document.getElementById('auth-ui-logged-in');
+                    if (currentUser && !currentUser.isAnonymous) {
+                        loggedOutUi.style.display = 'none';
+                        loggedInUi.style.display = 'flex';
+                        document.getElementById('user-email-display').textContent = currentUser.email || "User";
+                    } else {
+                        loggedOutUi.style.display = 'block';
+                        loggedInUi.style.display = 'none';
+                    }
+                });
+
+                const initAuth = async () => {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await authModule.signInWithCustomToken(auth, __initial_auth_token);
+                    else await authModule.signInAnonymously(auth);
+                };
+                await initAuth();
+
+            } catch (e) { console.error("Firebase init failed:", e); }
+        }
+
+        async function saveToCloud() {
+            if (!currentUser || !db) return alert("Please wait for cloud connection.");
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const projectData = { isRewaProject: true, populationData, mapData, stylingMode, defaultTextStyle };
+            try {
+                setStatus("Saving to cloud...", false);
+                const projectRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'map_projects', 'current');
+                await setDoc(projectRef, projectData);
+                setStatus("✓ Progress saved to Cloud!");
+            } catch (e) { console.error(e); setStatus("Failed to save to cloud.", true); }
+        }
+
+        async function loadFromCloud() {
+            if (!currentUser || !db) return alert("Please wait for cloud connection.");
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            try {
+                setStatus("Loading from cloud...", false);
+                const projectRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'map_projects', 'current');
+                const docSnap = await getDoc(projectRef);
+                if (docSnap.exists()) {
+                    const json = docSnap.data();
+                    populationData = json.populationData || {}; mapData = json.mapData; stylingMode = json.stylingMode || 'individual'; Object.assign(defaultTextStyle, json.defaultTextStyle);
+                    if (mapData && mapData.features) { mapData.features.forEach(f => { if (!f.textStyle) f.textStyle = { ...defaultTextStyle }; }); }
+                    selectedGeomId = null; historyStack = []; historyIndex = -1; buildTable();
+                    if (mapData) { resetZoom(); drawMapSVG(); } else { emptyState.style.display = 'block'; mapContainer.style.display = 'none'; }
+                    setStatus(`✓ Progress loaded from Cloud!`); saveState();
+                } else { setStatus("No cloud save found.", true); }
+            } catch (e) { console.error(e); setStatus("Failed to load from cloud.", true); }
+        }
+
+        // --- COLOR HELPERS ---
         function hexToRgb(hex) { return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)]; }
+        
         function getInterpolatedColor(pop) {
             const pops = Object.values(populationData).filter(n => n !== '' && !isNaN(n));
             if (pops.length === 0 || pop === '' || isNaN(pop)) return '#e2e8f0'; 
@@ -532,6 +734,19 @@
             const c1 = hexToRgb(MIN_COLOR), c2 = hexToRgb(MAX_COLOR);
             const r = Math.round(c1[0] + factor * (c2[0] - c1[0])), g = Math.round(c1[1] + factor * (c2[1] - c1[1])), b = Math.round(c1[2] + factor * (c2[2] - c1[2]));
             return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        }
+
+        function updateLegend() {
+            const pops = Object.values(populationData).filter(n => n !== '' && !isNaN(n));
+            if (pops.length === 0) {
+                if (legendMin) legendMin.textContent = 'Low Pop';
+                if (legendMax) legendMax.textContent = 'High Pop';
+                return;
+            }
+            const minPop = Math.min(...pops);
+            const maxPop = Math.max(...pops);
+            if (legendMin) legendMin.textContent = minPop.toLocaleString();
+            if (legendMax) legendMax.textContent = maxPop.toLocaleString();
         }
 
         function cloneCurrentState() {
@@ -876,11 +1091,23 @@
         }
 
         function updateStylingUIFromSelection() {
-            let ts = defaultTextStyle; if (stylingMode === 'individual' && selectedGeomId) { const f = mapData.features.find(feat => feat.internalId === selectedGeomId); if (f?.textStyle) ts = f.textStyle; }
+            let ts = defaultTextStyle; 
+            
+            let popVal = '';
+            if (stylingMode === 'individual' && selectedGeomId) { 
+                const f = mapData.features.find(feat => feat.internalId === selectedGeomId); 
+                if (f?.textStyle) ts = f.textStyle; 
+                if (f) popVal = populationData[f.wardNo];
+            }
+            
             textSizeSlider.value = ts.size; textSizeVal.textContent = ts.size + 'px';
             textOutlineWidthSlider.value = ts.outlineWidth || 2.5; textOutlineWidthVal.textContent = (ts.outlineWidth || 2.5) + 'px';
             borderThicknessSlider.value = ts.borderWidth || 1.5; borderThicknessVal.textContent = (ts.borderWidth || 1.5) + 'px';
             textColorPicker.value = ts.color; outlineColorPicker.value = ts.outlineColor; borderColorPicker.value = ts.borderColor || '#ffffff';
+            
+            // Handle unique fill color
+            fillColorPicker.value = ts.fillColor || getInterpolatedColor(popVal);
+            
             textBoldCheck.checked = ts.bold; textOutlineCheck.checked = ts.outline;
         }
 
@@ -890,14 +1117,23 @@
                 const path = document.getElementById(`path-${f.internalId}`), text = document.getElementById(`text-${f.internalId}`);
                 if (path && text) {
                     const isS = selectedGeomId === f.internalId, ts = f.textStyle || defaultTextStyle;
-                    path.setAttribute("fill", getInterpolatedColor(populationData[f.wardNo]));
-                    path.setAttribute("stroke", isS ? '#0f172a' : (ts.borderColor || '#ffffff'));
-                    path.setAttribute("stroke-width", isS ? (ts.borderWidth || 1.5) + 1.5 : (ts.borderWidth || 1.5));
+                    const pop = populationData[f.wardNo];
+                    
+                    const baseFillColor = ts.fillColor || getInterpolatedColor(pop);
+                    path.setAttribute("fill", baseFillColor);
+                    
+                    const baseBorder = ts.borderWidth !== undefined ? ts.borderWidth : 1.5;
+                    const baseBorderColor = ts.borderColor || '#ffffff';
+                    
+                    path.setAttribute("stroke", isS ? '#0f172a' : baseBorderColor);
+                    path.setAttribute("stroke-width", isS ? (baseBorder + 1.5) : baseBorder);
+                    
                     text.setAttribute("fill", ts.color); text.style.fontWeight = ts.bold ? 'bold' : 'normal';
                     text.style.stroke = ts.outline ? ts.outlineColor : 'none'; text.style.strokeWidth = ts.outline ? (ts.outlineWidth || 2.5) + 'px' : '0';
                     text.style.fontSize = (isS ? ts.size + 2 : ts.size) / currentScale + 'px';
                 }
             });
+            updateLegend();
         }
 
         function showTooltip(iid) {
@@ -920,7 +1156,7 @@
                 if (json.isRewaProject) {
                     populationData = json.populationData || {}; mapData = json.mapData; stylingMode = json.stylingMode || 'individual'; Object.assign(defaultTextStyle, json.defaultTextStyle);
                     if (mapData && mapData.features) { mapData.features.forEach(f => { if (!f.textStyle) f.textStyle = { ...defaultTextStyle }; }); }
-                    selectedGeomId = null; historyStack = []; historyIndex = -1; stylingControlsPanel.style.display = 'block'; buildTable();
+                    selectedGeomId = null; historyStack = []; historyIndex = -1; buildTable();
                     if (mapData) { resetZoom(); drawMapSVG(); } else { emptyState.style.display = 'block'; mapContainer.style.display = 'none'; }
                     setStatus("✓ Loaded."); saveState(); return;
                 }
@@ -933,7 +1169,7 @@
                     else if (f.geometry.type === 'MultiPolygon') coords.forEach(p => p.forEach(r => rings.push(ex(r))));
                     features.push({ internalId: iid, wardNo: wN, rings, textOffset: {x: 0, y: 0}, textStyle: null });
                 });
-                mapData = { features, bbox: [minX, minY, maxX, maxY] }; selectedGeomId = null; historyStack = []; historyIndex = -1; stylingControlsPanel.style.display = 'block'; buildTable(); resetZoom(); drawMapSVG(); setStatus("✓ Map loaded."); saveState();
+                mapData = { features, bbox: [minX, minY, maxX, maxY] }; selectedGeomId = null; historyStack = []; historyIndex = -1; buildTable(); resetZoom(); drawMapSVG(); setStatus("✓ Map loaded."); saveState();
             } catch (e) { console.error(e); setStatus("Parse Error.", true); }
         }
 
@@ -957,7 +1193,7 @@
                         features.push({ internalId: 'geom-' + (fIdx++), wardNo: (features.length + 1).toString(), rings, textOffset: {x: 0, y: 0}, textStyle: null });
                     } offset += 8 + rLen;
                 }
-                mapData = { features, bbox: [minX, minY, maxX, maxY] }; selectedGeomId = null; historyStack = []; historyIndex = -1; stylingControlsPanel.style.display = 'block'; buildTable(); resetZoom(); drawMapSVG(); setStatus("✓ Loaded."); saveState();
+                mapData = { features, bbox: [minX, minY, maxX, maxY] }; selectedGeomId = null; historyStack = []; historyIndex = -1; buildTable(); resetZoom(); drawMapSVG(); setStatus("✓ Loaded."); saveState();
             } catch (e) { console.error(e); setStatus("Parse Error.", true); }
         }
 
@@ -968,7 +1204,7 @@
             const xO = 20 + (760 - (maxX - minX) * scale) / 2, yO = 20 + (560 - (maxY - minY) * scale) / 2;
             const proj = (x, y) => [ (x - minX) * scale + xO, (maxY - y) * scale + yO ];
             mapData.features.forEach(f => {
-                let d = "", fMinX = Infinity, fMinY = Infinity, fMaxX = -Infinity, fMaxY = -Infinity;
+                let d = ""; let fMinX = Infinity, fMinY = Infinity, fMaxX = -Infinity, fMaxY = -Infinity;
                 f.rings.forEach(r => {
                     r.forEach((pt, i) => {
                         if(pt[0]<fMinX)fMinX=pt[0];if(pt[0]>fMaxX)fMaxX=pt[0];if(pt[1]<fMinY)fMinY=pt[1];if(pt[1]>fMaxY)fMaxY=pt[1];
@@ -978,9 +1214,13 @@
                 const [cx, cy] = proj((fMinX + fMaxX) / 2, (fMinY + fMaxY) / 2); f.d = d; f.centroid = [cx, cy];
                 if (!f.textOffset) f.textOffset = { x: 0, y: 0 };
                 const ts = f.textStyle || defaultTextStyle, path = document.createElementNS(SVG_NS, "path"), text = document.createElementNS(SVG_NS, "text");
-                path.setAttribute("d", d); path.setAttribute("class", "ward-path"); path.setAttribute("id", `path-${f.internalId}`); path.style.transformOrigin = `${cx}px ${cy}px`;
+                path.setAttribute("d", d); path.setAttribute("class", "ward-path");
+                path.setAttribute("id", `path-${f.internalId}`); path.setAttribute("data-id", f.internalId);
+                path.style.transformOrigin = `${cx}px ${cy}px`;
                 text.setAttribute("x", cx + f.textOffset.x); text.setAttribute("y", cy + f.textOffset.y + (ts.size / 3) / currentScale);
-                text.setAttribute("data-cy", cy + f.textOffset.y); text.setAttribute("text-anchor", "middle"); text.setAttribute("class", "ward-text"); text.setAttribute("id", `text-${f.internalId}`); text.textContent = f.wardNo;
+                text.setAttribute("data-cy", cy + f.textOffset.y); text.setAttribute("text-anchor", "middle");
+                text.setAttribute("class", "ward-text"); text.setAttribute("id", `text-${f.internalId}`);
+                text.textContent = f.wardNo;
                 text.addEventListener('dblclick', (e) => { e.stopPropagation(); showInlineEditor(f, text); });
                 const ev = (el) => {
                     el.addEventListener('mouseenter', () => showTooltip(f.internalId)); el.addEventListener('mouseleave', hideTooltip);
