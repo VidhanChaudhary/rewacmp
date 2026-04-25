@@ -179,7 +179,6 @@
 </head>
 <body>
 
-    <!-- Auth Modal Overlay -->
     <div id="auth-modal-overlay">
         <div id="auth-modal">
             <button id="btn-close-auth" class="auth-close">×</button>
@@ -192,7 +191,6 @@
         </div>
     </div>
 
-    <!-- SIDEBAR -->
     <div id="sidebar">
         <div class="sidebar-header" style="flex-direction: column; align-items: stretch;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
@@ -208,7 +206,6 @@
                 </button>
             </div>
             
-            <!-- Auth UI -->
             <div id="auth-ui-logged-out" style="margin-top: 15px;">
                 <button id="btn-open-login" class="upload-btn" style="padding: 8px; font-size: 0.8rem; background: #4f46e5; color: white; border: none; margin: 0;">Login / Sign Up to Cloud Save</button>
             </div>
@@ -224,7 +221,6 @@
             </div>
         </div>
 
-        <!-- HIDDEN STYLING MENU (Floating) -->
         <div id="styling-menu">
             <label class="section-title">Geography & Text Styling</label>
             
@@ -290,7 +286,6 @@
         </div>
 
         <div class="sidebar-content">
-            <!-- File Upload -->
             <div>
                 <label class="section-title">1. Map & Project Data</label>
                 <div class="action-row" style="margin-bottom: 8px;">
@@ -311,7 +306,6 @@
 
             <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
-            <!-- Selected Ward Panel -->
             <div id="selected-ward-panel">
                 <div class="panel-title">
                     <svg class="icon" style="color:var(--primary); width:16px; height:16px;" viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path><path d="M13 13l6 6"></path></svg>
@@ -336,7 +330,6 @@
                 <p id="editor-help" class="help-text">Click any ward on the map to select it. You can double-click text on the map to inline-edit.</p>
             </div>
 
-            <!-- Data Table -->
             <div class="table-wrap" id="table-wrap">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                     <label class="section-title" style="margin: 0;">Ward Data</label>
@@ -418,7 +411,6 @@
         </div>
     </div>
 
-    <!-- MAIN MAP AREA -->
     <div id="main-area">
         <div id="tooltip">
             <span>Ward: <span id="tt-ward" class="text-primary"></span></span>
@@ -453,7 +445,6 @@
         </div>
     </div>
 
-    <!-- JAVASCRIPT LOGIC -->
     <script>
         // --- CONSTANTS ---
         const MIN_COLOR = '#fde0dd';
@@ -659,8 +650,15 @@
                 const authModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
                 const firestoreModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
 
-                const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-                if (!firebaseConfig) { console.warn("Firebase not configured."); return; }
+                const firebaseConfig = {
+                  apiKey: "AIzaSyC-bz7BBVdppJWB1wB1f57vMX1LhDAlBxg",
+                  authDomain: "rewacmp.firebaseapp.com",
+                  projectId: "rewacmp",
+                  storageBucket: "rewacmp.firebasestorage.app",
+                  messagingSenderId: "832105705350",
+                  appId: "1:832105705350:web:85aebb706910364e668607",
+                  measurementId: "G-K9B5P4GEZD"
+                };
 
                 const app = appModule.initializeApp(firebaseConfig);
                 auth = authModule.getAuth(app); db = firestoreModule.getFirestore(app);
