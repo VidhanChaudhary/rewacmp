@@ -179,14 +179,22 @@
 </head>
 <body>
 
-    <div id="auth-modal-overlay">
+ <div id="auth-modal-overlay">
         <div id="auth-modal">
             <button id="btn-close-auth" class="auth-close">×</button>
-            <h2 id="auth-modal-title">Sign In</h2>
-            <input type="email" id="auth-email" class="auth-input" placeholder="Email Address">
-            <input type="password" id="auth-password" class="auth-input" placeholder="Password">
-            <button id="btn-submit-auth" class="auth-btn">Sign In</button>
-            <div id="auth-switch-mode" class="auth-switch">Need an account? Sign Up</div>
+            <h2 id="auth-modal-title">Login with OTP</h2>
+            
+            <div id="phone-step">
+                <input type="tel" id="auth-phone" class="auth-input" placeholder="+91 9876543210" required>
+                <div id="recaptcha-container" style="margin-bottom: 15px; display: flex; justify-content: center;"></div>
+                <button id="btn-send-otp" class="auth-btn">Send OTP</button>
+            </div>
+
+            <div id="otp-step" style="display: none;">
+                <input type="text" id="auth-otp" class="auth-input" placeholder="Enter 6-digit OTP" required>
+                <button id="btn-verify-otp" class="auth-btn">Verify & Login</button>
+            </div>
+
             <div id="auth-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 10px; text-align: center; display: none;"></div>
         </div>
     </div>
@@ -601,34 +609,16 @@
                 else if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); redo(); }
             });
 
-            // Auth Modal Events
-            document.getElementById('btn-open-login').addEventListener('click', () => { document.getElementById('auth-modal-overlay').style.display = 'flex'; document.getElementById('auth-error').style.display = 'none'; });
-            document.getElementById('btn-close-auth').addEventListener('click', () => document.getElementById('auth-modal-overlay').style.display = 'none');
-            document.getElementById('auth-switch-mode').addEventListener('click', () => {
-                isSignUpMode = !isSignUpMode;
-                document.getElementById('auth-modal-title').textContent = isSignUpMode ? "Sign Up" : "Sign In";
-                document.getElementById('btn-submit-auth').textContent = isSignUpMode ? "Sign Up" : "Sign In";
-                document.getElementById('auth-switch-mode').textContent = isSignUpMode ? "Already have an account? Sign In" : "Need an account? Sign Up";
+   // Auth Modal Events
+            document.getElementById('btn-open-login').addEventListener('click', () => { 
+                document.getElementById('auth-modal-overlay').style.display = 'flex'; 
                 document.getElementById('auth-error').style.display = 'none';
+                document.getElementById('phone-step').style.display = 'block';
+                document.getElementById('otp-step').style.display = 'none';
             });
-
-            document.getElementById('btn-submit-auth').addEventListener('click', async () => {
-                if (!auth) return alert("Cloud storage not loaded.");
-                const email = document.getElementById('auth-email').value.trim();
-                const pass = document.getElementById('auth-password').value;
-                const errEl = document.getElementById('auth-error');
-                errEl.style.display = 'none';
-                try {
-                    setStatus("Authenticating...", false);
-                    if (isSignUpMode) await createUserWithEmailAndPassword(auth, email, pass);
-                    else await signInWithEmailAndPassword(auth, email, pass);
-                    document.getElementById('auth-modal-overlay').style.display = 'none';
-                    setStatus("Successfully logged in.", false);
-                } catch (e) {
-                    errEl.textContent = e.message.replace('Firebase: ', '');
-                    errEl.style.display = 'block';
-                    setStatus("Authentication failed.", true);
-                }
+            
+            document.getElementById('btn-close-auth').addEventListener('click', () => {
+                document.getElementById('auth-modal-overlay').style.display = 'none';
             });
 
             document.getElementById('btn-sign-out').addEventListener('click', async () => {
@@ -644,6 +634,99 @@
             initZoomAndPan(); saveState(); initFirebase();
         }
 
+        async function initFirebase() {
+            try {
+                const appModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
+                const authModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                const firestoreModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+
+                const firebaseConfig = {
+                  apiKey: "AIzaSyC-bz7BBVdppJWB1wB1f57vMX1LhDAlBxg",
+                  authDomain: "rewacmp.firebaseapp.com",
+                  projectId: "rewacmp",
+                  storageBucket: "rewacmp.firebasestorage.app",
+                  messagingSenderId: "832105705350",
+                  appId: "1:832105705350:web:85aebb706910364e668607",
+                  measurementId: "G-K9B5P4GEZD"
+                };
+
+                const app = appModule.initializeApp(firebaseConfig);
+                auth = authModule.getAuth(app); 
+                db = firestoreModule.getFirestore(app);
+                signOut = authModule.signOut;
+                doc = firestoreModule.doc; setDoc = firestoreModule.setDoc; getDoc = firestoreModule.getDoc;
+
+                // Initialize reCAPTCHA for Phone Auth
+                window.recaptchaVerifier = new authModule.RecaptchaVerifier(auth, 'recaptcha-container', {
+                    'size': 'normal'
+                });
+
+                let confirmationResult;
+                const phoneStep = document.getElementById('phone-step');
+                const otpStep = document.getElementById('otp-step');
+                const errEl = document.getElementById('auth-error');
+
+                // Step 1: Send the SMS
+                document.getElementById('btn-send-otp').addEventListener('click', async () => {
+                    const phoneNumber = document.getElementById('auth-phone').value.trim();
+                    errEl.style.display = 'none';
+                    
+                    // Force country code requirement
+                    if(!phoneNumber.startsWith('+')) {
+                        errEl.textContent = "Please include country code (e.g., +91)";
+                        errEl.style.display = 'block';
+                        return;
+                    }
+                    
+                    try {
+                        setStatus("Sending OTP...", false);
+                        confirmationResult = await authModule.signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
+                        phoneStep.style.display = 'none';
+                        otpStep.style.display = 'block';
+                        setStatus("OTP sent via SMS!", false);
+                    } catch (error) {
+                        errEl.textContent = error.message.replace('Firebase: ', '');
+                        errEl.style.display = 'block';
+                    }
+                });
+
+                // Step 2: Verify the Code
+                document.getElementById('btn-verify-otp').addEventListener('click', async () => {
+                    const code = document.getElementById('auth-otp').value.trim();
+                    errEl.style.display = 'none';
+                    try {
+                        setStatus("Verifying OTP...", false);
+                        await confirmationResult.confirm(code);
+                        document.getElementById('auth-modal-overlay').style.display = 'none';
+                        setStatus("Successfully logged in.", false);
+                    } catch (error) {
+                        errEl.textContent = "Invalid OTP. Please try again.";
+                        errEl.style.display = 'block';
+                    }
+                });
+
+                authModule.onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    const loggedOutUi = document.getElementById('auth-ui-logged-out');
+                    const loggedInUi = document.getElementById('auth-ui-logged-in');
+                    if (currentUser && !currentUser.isAnonymous) {
+                        loggedOutUi.style.display = 'none';
+                        loggedInUi.style.display = 'flex';
+                        // Display the phone number in the sidebar instead of email
+                        document.getElementById('user-email-display').textContent = currentUser.phoneNumber || "User";
+                    } else {
+                        loggedOutUi.style.display = 'block';
+                        loggedInUi.style.display = 'none';
+                    }
+                });
+
+                const initAuth = async () => {
+                    await authModule.signInAnonymously(auth);
+                };
+                await initAuth();
+
+            } catch (e) { console.error("Firebase init failed:", e); }
+        }
         async function initFirebase() {
             try {
                 const appModule = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
