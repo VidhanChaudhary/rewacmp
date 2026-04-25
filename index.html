@@ -185,16 +185,26 @@
             <button id="btn-close-auth" class="auth-close">×</button>
             <h2 style="margin-bottom: 20px; text-align: center; font-size: 1.2rem;">Login / Sign Up</h2>
             
-            <div style="display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="toggle-pw" class="method-btn active" style="flex: 1; padding: 8px; font-size: 0.7rem; background: var(--primary); color: white; border-radius: 6px; border: 1px solid var(--primary); cursor: pointer;">Password</button>
-                <button id="toggle-email" class="method-btn" style="flex: 1; padding: 8px; font-size: 0.7rem; background: #f8fafc; color: black; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">Magic Link</button>
-                <button id="toggle-phone" class="method-btn" style="flex: 1; padding: 8px; font-size: 0.7rem; background: #f8fafc; color: black; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">Phone OTP</button>
+            <button id="btn-google-login" style="width: 100%; padding: 10px; background: white; color: #444; border: 1px solid #ddd; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.8rem;">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="16" height="16">
+                Sign in with Google
+            </button>
+
+            <div style="text-align: center; margin-bottom: 15px; font-size: 0.7rem; color: #888;">— OR —</div>
+
+            <div style="display: flex; gap: 5px; margin-bottom: 20px;">
+                <button id="toggle-pw" class="method-btn active" style="flex: 1; padding: 8px; font-size: 0.7rem; background: var(--primary); color: white; border-radius: 6px; border: 1px solid var(--primary); cursor: pointer;">Email</button>
+                <button id="toggle-email" class="method-btn" style="flex: 1; padding: 8px; font-size: 0.7rem; background: #f8fafc; color: black; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">Login Link</button>
+                <button id="toggle-phone" class="method-btn" style="flex: 1; padding: 8px; font-size: 0.7rem; background: #f8fafc; color: black; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">Phone</button>
             </div>
 
             <div id="pw-section">
                 <input type="email" id="auth-email-pw" class="auth-input" placeholder="Email Address">
                 <input type="password" id="auth-password" class="auth-input" placeholder="Password">
                 <button id="btn-login-pw" class="auth-btn">Login / Sign Up</button>
+                <div style="text-align: right; margin-top: 8px;">
+                    <span id="btn-forgot-pw" style="font-size: 0.7rem; color: var(--primary); cursor: pointer; text-decoration: underline;">Forgot Password?</span>
+                </div>
             </div>
 
             <div id="email-section" style="display: none;">
@@ -691,12 +701,26 @@
                             document.getElementById(tabs[s]).classList.toggle('active', s === key);
                             // Reset Tab colors if needed
                             document.getElementById(tabs[s]).style.background = (s === key) ? 'var(--primary)' : '#f8fafc';
-                            document.getElementById(tabs[s]).style.color = (s === key) ? 'black' : '#64748b';
+                            document.getElementById(tabs[s]).style.color = (s === key) ? 'white' : 'black';
                         });
                         document.getElementById(tabs[key]).style.background = 'var(--primary)';
                         document.getElementById(tabs[key]).style.color = 'white';
                     };
                 });
+
+                // --- GOOGLE AUTH LOGIC ---
+                document.getElementById('btn-google-login').onclick = async () => {
+                    const errEl = document.getElementById('auth-error');
+                    errEl.style.display = 'none';
+                    try {
+                        const provider = new authM.GoogleAuthProvider();
+                        await authM.signInWithPopup(auth, provider);
+                        document.getElementById('auth-modal-overlay').style.display = 'none';
+                    } catch (e) {
+                        errEl.textContent = e.message.replace('Firebase: ', '');
+                        errEl.style.display = 'block';
+                    }
+                };
 
                 // --- METHOD 1: EMAIL & PASSWORD ---
                 document.getElementById('btn-login-pw').onclick = async () => {
@@ -714,6 +738,24 @@
                                 document.getElementById('auth-modal-overlay').style.display = 'none';
                             } catch (err) { errEl.textContent = err.message.replace('Firebase: ', ''); errEl.style.display = 'block'; }
                         } else { errEl.textContent = e.message.replace('Firebase: ', ''); errEl.style.display = 'block'; }
+                    }
+                };
+
+                // --- FORGOT PASSWORD LOGIC ---
+                document.getElementById('btn-forgot-pw').onclick = async () => {
+                    const email = document.getElementById('auth-email-pw').value;
+                    const errEl = document.getElementById('auth-error');
+                    if (!email) {
+                        errEl.textContent = "Please enter your email address first.";
+                        errEl.style.display = 'block';
+                        return;
+                    }
+                    try {
+                        await authM.sendPasswordResetEmail(auth, email);
+                        alert("Password reset email sent to " + email);
+                    } catch (e) {
+                        errEl.textContent = e.message.replace('Firebase: ', '');
+                        errEl.style.display = 'block';
                     }
                 };
 
@@ -754,6 +796,7 @@
                     window.history.replaceState({}, document.title, window.location.pathname);
                 }
 
+                // Auth State Observer
                 authM.onAuthStateChanged(auth, (user) => {
                     currentUser = user;
                     document.getElementById('auth-ui-logged-out').style.display = user ? 'none' : 'block';
